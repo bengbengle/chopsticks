@@ -37,6 +37,7 @@ export interface BuildBlockParams {
 }
 
 export class TxPool {
+
   readonly #chain: Blockchain
 
   readonly #pool: { extrinsic: HexString; signer: string }[] = []
@@ -98,6 +99,7 @@ export class TxPool {
   }
 
   async submitExtrinsic(extrinsic: HexString) {
+
     logger.debug({ extrinsic: truncate(extrinsic) }, 'submit extrinsic')
 
     this.#pool.push({ extrinsic, signer: await this.#getSigner(extrinsic) })
@@ -157,20 +159,14 @@ export class TxPool {
 
   #batchBuildBlock = _.debounce(this.buildBlock, 100, { maxWait: 1000 })
 
-  async buildBlockWithParams(params: BuildBlockParams) {
-    this.#pendingBlocks.push({
-      params,
-      deferred: defer<void>(),
-    })
-    this.#buildBlockIfNeeded()
-    await this.upcomingBlocks()
-  }
-
   async buildBlock(params?: Partial<BuildBlockParams>) {
     const transactions = params?.transactions || this.#pool.splice(0).map(({ extrinsic }) => extrinsic)
     const upwardMessages = params?.upwardMessages || { ...this.#ump }
     const downwardMessages = params?.downwardMessages || this.#dmp.splice(0)
     const horizontalMessages = params?.horizontalMessages || { ...this.#hrmp }
+    
+    console.log('params::', JSON.stringify(params) )
+
     if (!params?.upwardMessages) {
       for (const id of Object.keys(this.#ump)) {
         delete this.#ump[id]
@@ -187,6 +183,15 @@ export class TxPool {
       downwardMessages,
       horizontalMessages,
     })
+  }
+
+  async buildBlockWithParams(params: BuildBlockParams) {
+    this.#pendingBlocks.push({
+      params,
+      deferred: defer<void>(),
+    })
+    this.#buildBlockIfNeeded()
+    await this.upcomingBlocks()
   }
 
   async upcomingBlocks() {
@@ -211,6 +216,7 @@ export class TxPool {
   }
 
   async #buildBlock() {
+
     await this.#chain.api.isReady
 
     const pending = this.#pendingBlocks[0]
@@ -223,6 +229,9 @@ export class TxPool {
 
     const head = this.#chain.head
     const inherents = await this.#inherentProvider.createInherents(head, params)
+
+    let pretime = new Date().getTime()
+
     const [newBlock, pendingExtrinsics] = await buildBlock(
       head,
       inherents,
@@ -232,6 +241,10 @@ export class TxPool {
         this.event.emit(APPLY_EXTRINSIC_ERROR, [extrinsic, error])
       },
     )
+    let posttime = new Date().getTime()
+    
+    console.log('buildBlock take:', posttime - pretime)
+
     for (const extrinsic of pendingExtrinsics) {
       this.#pool.push({ extrinsic, signer: await this.#getSigner(extrinsic) })
     }

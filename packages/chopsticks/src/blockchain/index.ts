@@ -16,6 +16,7 @@ import { StorageValue } from './storage-layer'
 import { compactHex } from '../utils'
 import { defaultLogger } from '../logger'
 import { dryRunExtrinsic, dryRunInherents } from './block-builder'
+import { Timer } from '../timer'
 
 const logger = defaultLogger.child({ name: 'blockchain' })
 
@@ -29,7 +30,8 @@ export interface Options {
   allowUnresolvedImports?: boolean
   runtimeLogLevel?: number
   registeredTypes: RegisteredTypes
-  offchainWorker?: boolean
+  offchainWorker?: boolean,
+  interval?: number,
 }
 
 export class Blockchain {
@@ -49,9 +51,12 @@ export class Blockchain {
   readonly #blocksByHash: Record<string, Block> = {}
   readonly #loadingBlocks: Record<string, Promise<void>> = {}
 
+
   readonly headState: HeadState
 
   readonly offchainWorker: OffchainWorker | undefined
+
+  readonly miningTimer: Timer | undefined
 
   constructor({
     api,
@@ -64,6 +69,7 @@ export class Blockchain {
     runtimeLogLevel = 0,
     registeredTypes = {},
     offchainWorker = false,
+    interval = 0,
   }: Options) {
     this.api = api
     this.db = db
@@ -83,6 +89,11 @@ export class Blockchain {
     if (offchainWorker) {
       this.offchainWorker = new OffchainWorker()
     }
+
+    if (!this.miningTimer) {
+      this.miningTimer = this.initMiningTimer(interval);
+    }
+
   }
 
   #registerBlock(block: Block) {
@@ -316,5 +327,21 @@ export class Blockchain {
       horizontalMessages: {},
     })
     return inherents
+  }
+
+  initMiningTimer(interval: number): Timer {
+
+    const that =  this
+    const _mineFunc = async () => {
+      try {
+        that.newBlock()
+      }
+      catch (e) {
+        console.error("Unexpected error calling hardhat_intervalMine:", e);
+      }
+    }
+
+    const _timer = new Timer(interval, _mineFunc);
+    return _timer;
   }
 }

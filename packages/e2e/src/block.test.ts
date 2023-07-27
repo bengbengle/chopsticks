@@ -14,8 +14,11 @@ describe('block', async () => {
   it('upcoming block works', async () => {
     const promises: Promise<any>[] = []
     expect(await chain.upcomingBlocks()).toEqual(0)
+
     promises.push(dev.newBlock())
+    
     await delay(10)
+    
     expect(await chain.upcomingBlocks()).toEqual(1)
 
     promises.push(dev.newBlock())

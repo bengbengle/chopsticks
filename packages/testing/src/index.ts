@@ -59,6 +59,9 @@ export const setupContext = async (option: SetupOption) => {
 }
 
 export const setupContextWithConfig = async ({ timeout, ...config }: SetupConfig) => {
+
+  console.log('setupContextWithConfig config:', config)
+  
   const { chain, listenPort, close } = await setupWithServer(config)
 
   const url = `ws://localhost:${listenPort}`
@@ -93,12 +96,16 @@ export const setupContextWithConfig = async ({ timeout, ...config }: SetupConfig
       setHead: (hashOrNumber: string | number) => {
         return ws.send('dev_setHead', [hashOrNumber])
       },
+      setIntervalMining: (interval?: number) => {
+        return ws.send('dev_setIntervalMining', [interval])
+      },
     },
     async teardown() {
       await api.disconnect()
       await close()
     },
     async pause() {
+      
       await ws.send('dev_setBlockBuildMode', [BuildBlockMode.Instant])
 
       // log a bit later to ensure the message is visible
